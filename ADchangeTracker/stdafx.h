@@ -10,6 +10,7 @@
 #include <windows.h>
 #include <Strsafe.h>
 #include "pugixml.hpp"
+#include <Shlobj.h>
 #pragma comment(lib, "wevtapi.lib")
 
 #include <assert.h>

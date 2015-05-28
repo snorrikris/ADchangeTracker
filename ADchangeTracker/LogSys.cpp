@@ -303,8 +303,42 @@ void CLogSys::Init()
 		strcat_s(m_szLogFilePath, sizeof(m_szLogFilePath), "Logs\\");
 	}
 
-	strcpy_s(m_szApplication, sizeof(m_szApplication), m_szAppFilename);
 	strcpy_s(m_szUserName, sizeof(m_szUserName), m_szLoggedOnUsername);
+	strcpy_s(m_szApplication, sizeof(m_szApplication), m_szAppFilename);
+	nLen = strlen(m_szApplication);
+	if (nLen)
+	{	// Remove .exe from string
+		while (nLen > 0 && m_szApplication[nLen] != '.')
+			nLen--;
+		m_szApplication[nLen] = 0;
+	}
+
+	// Get path to %PROGRAMDATA% folder.
+	PWSTR pszPath = 0;
+	HRESULT hr = SHGetKnownFolderPath(FOLDERID_ProgramData, 0, NULL, &pszPath);
+	if (hr == S_OK)
+	{
+		char szLogDir[MAX_PATH];
+		memset(szLogDir, 0, sizeof(szLogDir));
+		nLen = _tcslen(pszPath);
+		CharToOemBuff(pszPath, szLogDir, nLen);
+		strcat_s(szLogDir, sizeof(szLogDir), "\\");
+		strcat_s(szLogDir, sizeof(szLogDir), m_szApplication);
+		BOOL fCreateResult = CreateDirectoryA(szLogDir, NULL);
+		DWORD dwError = GetLastError();
+		if (fCreateResult || ERROR_ALREADY_EXISTS == dwError)
+		{
+			// Directory was created or already existed.
+			strcpy_s(m_szLogFilePath, sizeof(m_szLogFilePath), szLogDir);
+			strcat_s(m_szLogFilePath, sizeof(m_szLogFilePath), "\\");
+
+			strcpy_s(m_szModuleFilenameBase, sizeof(m_szModuleFilenameBase), m_szLogFilePath);
+			strcat_s(m_szModuleFilenameBase, sizeof(m_szModuleFilenameBase), m_szApplication);
+			strcat_s(m_szModuleFilenameBase, sizeof(m_szModuleFilenameBase), "_");
+		}
+	}
+	CoTaskMemFree(static_cast<void*>(pszPath));
+	pszPath = 0;
 
 	m_fInit = TRUE;
 }
