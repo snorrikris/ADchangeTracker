@@ -62,6 +62,14 @@ void CLogSys::Add2LogLvl( const char *szModule, const char *szLogEvent,
 
 	::EnterCriticalSection( &m_critsect );
 
+	// Detect if current log file was created yesterday.
+	SYSTEMTIME now, &cur = m_stCurFileStartTime;
+	GetSystemTime(&now);
+	if (now.wYear != cur.wYear || now.wMonth != cur.wMonth || now.wDay != cur.wDay)
+	{
+		CreateNewLogFile();	// Create new log file every day.
+	}
+
 	DWORD dwThreadID = ::GetCurrentThreadId();
 	char szThreadID[20];
 	sprintf_s( szThreadID, sizeof(szThreadID), "%u", dwThreadID );
