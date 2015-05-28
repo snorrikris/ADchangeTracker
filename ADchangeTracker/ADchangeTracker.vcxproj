@@ -85,6 +85,7 @@
     <ClInclude Include="LogSys.h" />
     <ClInclude Include="pugiconfig.hpp" />
     <ClInclude Include="pugixml.hpp" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
@@ -101,6 +102,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="ADchangeTracker.cfg" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Resource.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
