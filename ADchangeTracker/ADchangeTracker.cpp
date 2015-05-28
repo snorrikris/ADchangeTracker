@@ -382,6 +382,10 @@ void CADchangeTrackerSvc::ParseConfigFileLine(TCHAR *szLine)
 		config.nNumElemIgnoreEvts = ParseIgnoredEvts(param, 
 			config.sarrIgnoreEvts, sizeof(config.sarrIgnoreEvts) / sizeof(IGNORE_EVENTS));
 	}
+	else if (_tcsstr(setting, L"VerboseLogging") != NULL)
+	{
+		config.fIsVerboseLogging = ParseBoolParam(param);
+	}
 }
 
 int CADchangeTrackerSvc::ParseAcceptedIDs(TCHAR *szEventIDs, int *pnarrEvents, int nNumElem)
@@ -421,5 +425,19 @@ int CADchangeTrackerSvc::ParseIgnoredEvts(TCHAR *szIgnoredEvts, IGNORE_EVENTS *p
 		token = _tcstok_s(NULL, seps, &next);
 	}
 	return elem;
+}
+
+int CADchangeTrackerSvc::ParseBoolParam(TCHAR *szParam)
+{
+	TCHAR szSrc[64];
+	StringCchCopy(szSrc, sizeof(szSrc), szParam);
+	_tcslwr_s(szSrc);
+	if (_tcsstr(szSrc, L"1") != NULL)
+		return TRUE;
+	if (_tcsstr(szSrc, L"true") != NULL)
+		return TRUE;
+	if (_tcsstr(szSrc, L"on") != NULL)
+		return TRUE;
+	return FALSE;
 }
 
