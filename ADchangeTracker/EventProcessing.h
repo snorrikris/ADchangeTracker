@@ -40,11 +40,7 @@ public:
 	void ServiceMain();
 	void ServiceCtrlHandler(DWORD dwCtrl);
 
-	BOOL Init();	// Returns FALSE if service can not start.
-
 	void Start();
-
-	void SetStopSignal();
 
 	EVENT_PROCESSING_CONFIG & GetConfigStruct() { return m_config; }
 
@@ -79,7 +75,7 @@ protected:
 	HANDLE m_hEvent_SqlConnLost, m_hEvent_ServiceStop;
 
 	// NT service data
-	SERVICE_STATUS_HANDLE	m_hSvcStatusHandle;
+	SERVICE_STATUS_HANDLE	m_hSvcStatusHandle;		// Note - the handle does not have to be closed.
 	SERVICE_STATUS			m_sSvcStatus;
 	DWORD					m_dwCheckPoint;			// Service start checkpoint.
 };

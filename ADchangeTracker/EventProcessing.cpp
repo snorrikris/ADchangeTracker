@@ -40,8 +40,10 @@ CEventProcessing::CEventProcessing()
 
 CEventProcessing::~CEventProcessing()
 {
-	assert(m_hSubscription == NULL);
-	assert(m_hBookmark == NULL);
+	assert(m_hSubscription == NULL
+		&& m_hBookmark == NULL
+		&& m_hEvent_SqlConnLost == NULL
+		&& m_hEvent_ServiceStop == NULL);
 }
 
 void CEventProcessing::ServiceMain()
@@ -59,17 +61,50 @@ void CEventProcessing::ServiceMain()
 
 	// Report initial status to the SCM
 	ReportServiceStatus(SERVICE_START_PENDING, NO_ERROR, 3000);
+	theLogSys.Add2LogI(MOD_NAME, "Service starting");
 
-	// TO_DO: Declare and set any required variables.
-	//   Be sure to periodically call ReportSvcStatus() with 
-	//   SERVICE_START_PENDING. If initialization fails, call
-	//   ReportSvcStatus with SERVICE_STOPPED.
+	// Initialize things needed for service start.
+	BOOL fIsInitialized = TRUE;
 
+	// Initialize ADO (COM library).
 	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 
-	if (FALSE == Init())	// Initialize ADO and other things.
+	// Verify that minimum required settings are present.
+	if (_tcslen(m_config.szConnectionString) == 0)
 	{
-		theLogSys.Add2LogE(MOD_NAME, "Init failed", "Service can't start");
+		theLogSys.Add2LogE(MOD_NAME, "SQL connection string missing");
+		fIsInitialized = FALSE;
+	}
+	if (m_config.nNumElemAcceptedEvts == 0)
+	{
+		theLogSys.Add2LogW(MOD_NAME, "List of accepted EventIDs missing", "This service will do nothing");
+		fIsInitialized = FALSE;
+	}
+
+	// Create a event object - that will signal when service should stop.
+	if ((m_hEvent_ServiceStop = CreateEvent(NULL, TRUE, FALSE, NULL)) == NULL)
+	{
+		theLogSys.Add2LogEsyserr(MOD_NAME, "Create service stop event failed", "", GetLastError());
+		fIsInitialized = FALSE;
+	}
+
+	// Create a event object - that will signal if SQL connection is lost.
+	if ((m_hEvent_SqlConnLost = CreateEvent(NULL, TRUE, FALSE, NULL)) == NULL)
+	{
+		theLogSys.Add2LogEsyserr(MOD_NAME, "Create SQL connection lost event failed", "", GetLastError());
+		fIsInitialized = FALSE;
+	}
+
+	// Initialize SQL server connection (not connecting at this time).
+	if (!m_sqlServer.InitSqlConnection(m_config.szConnectionString))
+	{
+		theLogSys.Add2LogE(MOD_NAME, "Initialize SQL ADO failed");
+		fIsInitialized = FALSE;
+	}
+
+	if (FALSE == fIsInitialized)	// Initialize failed - service can't start.
+	{
+		theLogSys.Add2LogE(MOD_NAME, "Initialize service failed", "Service can't start");
 		ReportServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
 		return;
 	}
@@ -78,10 +113,27 @@ void CEventProcessing::ServiceMain()
 	ReportServiceStatus(SERVICE_RUNNING, NO_ERROR, 0);
 	theLogSys.Add2LogI(MOD_NAME, "Service running");
 
+	///////////////////////////////////////////////////////////////////////////
+	// Call service start function.
 	Start();
+	// The Start function returns when the service is stopping.
+
+	theLogSys.Add2LogI(MOD_NAME, "Service is stopping");
+
+	StopEventSubscription();
+
+	m_sqlServer.ExitConnection();
+
+	CloseHandle(m_hEvent_SqlConnLost);
+	m_hEvent_SqlConnLost = NULL;
+
+	CloseHandle(m_hEvent_ServiceStop);
+	m_hEvent_ServiceStop = NULL;
+
+	CoUninitialize();
 
 	ReportServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
-	theLogSys.Add2LogI(MOD_NAME, "ServiceMain ends");
+	theLogSys.Add2LogI(MOD_NAME, "Service stopped");
 }
 
 void CEventProcessing::ServiceCtrlHandler(DWORD dwCtrl)
@@ -93,11 +145,11 @@ void CEventProcessing::ServiceCtrlHandler(DWORD dwCtrl)
 	{
 	case SERVICE_CONTROL_STOP:
 		theLogSys.Add2LogI(MOD_NAME, "SERVICE_CONTROL_STOP command received");
-		ReportServiceStatus(SERVICE_STOP_PENDING, NO_ERROR, 0);
+		ReportServiceStatus(SERVICE_STOP_PENDING, NO_ERROR, 1000);
 
 		// Signal the service to stop.
-		SetStopSignal();
-		ReportServiceStatus(m_sSvcStatus.dwCurrentState, NO_ERROR, 0);
+		SetEvent(m_hEvent_ServiceStop);
+		//ReportServiceStatus(m_sSvcStatus.dwCurrentState, NO_ERROR, 0);
 		return;
 
 	case SERVICE_CONTROL_INTERROGATE:
@@ -108,61 +160,41 @@ void CEventProcessing::ServiceCtrlHandler(DWORD dwCtrl)
 	}
 }
 
-BOOL CEventProcessing::Init()
-{
-	// TODO: return FALSE if service should not start because of some system error etc.
-
-	// Verify that minimum required settings are present.
-	if (_tcslen(m_config.szConnectionString) == 0)
-	{
-		theLogSys.Add2LogE(MOD_NAME, "SQL connection string missing");
-	}
-	if (m_config.nNumElemAcceptedEvts == 0)
-	{
-		theLogSys.Add2LogW(MOD_NAME, "List of accepted EventIDs missing", "This service will do nothing");
-	}
-
-	// Create a event object - that will signal when service should stop.
-	m_hEvent_ServiceStop = CreateEvent(NULL, TRUE, FALSE, NULL);
-
-	// Create a event object - that will signal if SQL connection is lost.
-	m_hEvent_SqlConnLost = CreateEvent(NULL, TRUE, FALSE, NULL);
-
-	// Initialize and start SQL server connection.
-	m_sqlServer.InitSqlConnection(m_config.szConnectionString);
-
-	return TRUE;
-}
-
 void CEventProcessing::Start()
 {
-	m_sqlServer.OpenSqlConnection();
+	// Start SQL server connection.
+	if (m_sqlServer.OpenSqlConnection())
+	{
+		// Start Security event log subscription - if connected to SQL.
+		StartEventSubscription();
+	}
+	else
+	{
+		// Set SQL connection lost event - note: retry connect every 60 seconds.
+		SetEvent(m_hEvent_SqlConnLost);
+	}
 
-	// Start Security event log subscription.
-	StartEventSubscription();
-
-	//wprintf(L"Hit any key to quit\n\n");
+	HANDLE harrEvents[2] = { m_hEvent_ServiceStop, m_hEvent_SqlConnLost };
+	DWORD dwNumEvents = sizeof(harrEvents) / sizeof(HANDLE);
 	while (TRUE)
 	{
-		//if (_kbhit())
-		//	break;
+		DWORD dwWaitResult = WaitForMultipleObjects(dwNumEvents, harrEvents, FALSE, INFINITE);
 
 		// Check whether to stop the service.
-		if (WaitForSingleObject(m_hEvent_ServiceStop, 0) == WAIT_OBJECT_0)
+		//if (WaitForSingleObject(m_hEvent_ServiceStop, 0) == WAIT_OBJECT_0)
+		if (dwWaitResult == WAIT_OBJECT_0)
 		{
 			// Stop event is in signaled state.
 			theLogSys.Add2LogI(MOD_NAME, "Stop event signaled");
-			break;	// Stop service.
+			break;	// Stop the service.
 		}
 
-		// m_hEvent_SqlConnLost event is in signalled state until SQL connection regained.
-		if (WaitForSingleObject(m_hEvent_SqlConnLost, 0) == WAIT_OBJECT_0)
+		// m_hEvent_SqlConnLost event is in signaled state until SQL connection regained.
+		//if (WaitForSingleObject(m_hEvent_SqlConnLost, 0) == WAIT_OBJECT_0)
+		if (dwWaitResult == (WAIT_OBJECT_0 + 1))
 		{
-			// Stop event subscription.
-			if (m_hSubscription)
-			{
-				StopEventSubscription();
-			}
+			// Stop event subscription - (if needed).
+			StopEventSubscription();
 
 			// Retry SQL connection every 60 sec.
 			if (m_sqlServer.GetSecondsSinceLastRetry() > 60)
@@ -175,20 +207,8 @@ void CEventProcessing::Start()
 				}
 			}
 		}
-
-		Sleep(10);
-	}
-
-	StopEventSubscription();
-
-	m_sqlServer.ExitConnection();
-
-	CloseHandle(m_hEvent_SqlConnLost);
-}
-
-void CEventProcessing::SetStopSignal()
-{
-	SetEvent(m_hEvent_ServiceStop);
+		Sleep(100);
+	}	// endof while loop
 }
 
 //   Sets the current service status and reports it to the SCM.
@@ -218,6 +238,8 @@ void CEventProcessing::ReportServiceStatus(DWORD dwCurrentState,
 
 BOOL CEventProcessing::StartEventSubscription()
 {
+	theLogSys.Add2LogI(MOD_NAME, "StartEventSubscription called");
+
 	// Get the saved bookmark.
 	GetBookmark();
 
@@ -242,6 +264,11 @@ BOOL CEventProcessing::StartEventSubscription()
 
 void CEventProcessing::StopEventSubscription()
 {
+	if (!m_hSubscription)
+		return;
+
+	theLogSys.Add2LogI(MOD_NAME, "StopEventSubscription called");
+
 	SaveBookmark();
 
 	if (m_hSubscription)
@@ -261,29 +288,11 @@ void CEventProcessing::StopEventSubscription()
 DWORD WINAPI CEventProcessing::SubscriptionCallback(EVT_SUBSCRIBE_NOTIFY_ACTION action, PVOID pContext,
 	EVT_HANDLE hEvent)
 {
-	//EVT_HANDLE hBookmark = (EVT_HANDLE)pContext;
 	assert(pContext != NULL);
 	CEventProcessing &thisobj = *(CEventProcessing *)pContext;
 
-	DWORD status = ERROR_SUCCESS;
-
 	switch (action)
 	{
-		// You should only get the EvtSubscribeActionError action if your subscription flags 
-		// includes EvtSubscribeStrict and the channel contains missing event records.
-	case EvtSubscribeActionError:
-		if (ERROR_EVT_QUERY_RESULT_STALE == (DWORD)hEvent)
-		{
-			//wprintf(L"The subscription callback was notified that event records are missing.\n");
-			// Handle if this is an issue for your application.
-		}
-		else
-		{
-			theLogSys.Add2LogEsyserr(MOD_NAME, "Event SubscriptionCallback received an error",
-				"", (DWORD)hEvent);
-		}
-		break;
-
 	case EvtSubscribeActionDeliver:
 		thisobj.ProcessEvent(hEvent);
 		break;
@@ -291,16 +300,7 @@ DWORD WINAPI CEventProcessing::SubscriptionCallback(EVT_SUBSCRIBE_NOTIFY_ACTION 
 	default:
 		theLogSys.Add2LogW(MOD_NAME, "SubscriptionCallback: Unknown action");
 	}
-
-//cleanup:
-
-	if (ERROR_SUCCESS != status)
-	{
-		// End subscription - Use some kind of IPC mechanism to signal
-		// your application to close the subscription handle.
-	}
-
-	return status; // The service ignores the returned status.
+	return ERROR_SUCCESS; // The service ignores the returned status.
 }
 
 void CEventProcessing::ProcessEvent(EVT_HANDLE hEvent)
@@ -342,8 +342,7 @@ void CEventProcessing::ProcessEvent(EVT_HANDLE hEvent)
 		{
 			status = GetLastError();
 			theLogSys.Add2LogEsyserr(MOD_NAME,
-				"EvtUpdateBookmark failed in SubscriptionCallback function",
-				"", status);
+				"EvtUpdateBookmark failed in SubscriptionCallback function", "", status);
 			goto cleanup;
 		}
 	}
@@ -368,7 +367,7 @@ BOOL CEventProcessing::FilterAndSendEventToSql(LPWSTR pXML, DWORD dwXMLlen)
 	// Get EventRecordID, EventID and ObjectClass (if exists) from Event XML.
 	char szEventRecordID[128] = { 0 }, szEventID[128] = { 0 };
 	int nEventID = 0;
-	xml_node evtrecid = doc.first_element_by_path("/Event/System/EventID");
+	xml_node evtrecid = doc.first_element_by_path("/Event/System/EventRecordID");
 	if (evtrecid)
 	{
 		strcpy_s(szEventRecordID, evtrecid.first_child().value());
@@ -380,22 +379,20 @@ BOOL CEventProcessing::FilterAndSendEventToSql(LPWSTR pXML, DWORD dwXMLlen)
 		nEventID = atoi(szEventID);
 	}
 
-	char szTmp[128] = { 0 };
+	char szOC[128] = { 0 };
 	TCHAR szObjClass[128] = { 0 };
 	xpath_node objclass = doc.select_node("//Data[@Name='ObjectClass']/text()");
 	if (objclass)
 	{
 		// Make (buffer) safe copy of ObjClass from XML.
-		strcpy_s(szTmp, objclass.node().value());
-		OemToChar(szTmp, szObjClass);	// Convert to UNICODE
-		//StringCchCopy(szObjClass, sizeof(szObjClass), szObjClass);
-		//strcpy_s(szObjClass, objclass.node().value());
+		strcpy_s(szOC, objclass.node().value());
+		OemToChar(szOC, szObjClass);	// Convert to UNICODE
 	}
 	if (IsAcceptedEvent(nEventID))
 	{
 		if (IsIgnoredEvent(nEventID, szObjClass))
 		{
-			LogInfo("Event ignored", szEventRecordID);
+			LogInfo("Event ignored", szEventRecordID, szOC);
 		}
 		else
 		{	// Send event to SQL.

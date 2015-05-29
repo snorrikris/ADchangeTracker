@@ -20,14 +20,6 @@ public:
 
 	BOOL IsSqlConnectionLost() { return m_fConnectionLost; }
 
-	// Call this function every 2 seconds to verify SQL server is still connected.
-	// Note - does nothing if Sql excluded flag = TRUE.
-	// Note - does nothing if m_fConnectionLost is already TRUE.
-	// Note - this function will read DB version number from Settings table to test
-	//		the SQL server connection. If that operations fails because connection to
-	//		SQL servar was lost; 'this' object will have 'connaection lost' state.
-	//void CheckSqlConnectionHealth( const char *szLogModuleName );
-
 	// Call this function every X seconds to retry connect to SQL server.
 	// Note - does nothing if m_fConnectionLost is not TRUE.
 	BOOL RetrySqlConnection();
@@ -54,4 +46,5 @@ private:
 	int				m_nSQLconnUseCount;
 	__int64			m_nLastRetryConnectTime;	// Set to current time when connection lost
 												// and when RetrySqlConnection called.
+	void SetRetryConnectTime();
 };

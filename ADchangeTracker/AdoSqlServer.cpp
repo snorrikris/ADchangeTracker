@@ -55,11 +55,9 @@ _ConnectionPtr CAdoSqlServer::OpenSqlConnection()
 	if( m_pADO_SQLconnection->State == adStateClosed )
 	{
 		BSTR bstrSqlConn = ::SysAllocString(m_szConnectionString);
-			//L"Provider='sqloledb';Data Source='SANDMAN';Initial Catalog='AD_DW';Integrated Security=SSPI;");
 		try
 		{
-			m_pADO_SQLconnection->Open(bstrSqlConn, "", "",
-					adConnectUnspecified );
+			m_pADO_SQLconnection->Open(bstrSqlConn, "", "", adConnectUnspecified );
 		}
 		catch(_com_error &e)
 		{
@@ -77,49 +75,25 @@ _ConnectionPtr CAdoSqlServer::OpenSqlConnection()
 			m_pADO_SQLconnection->Errors->Clear();
 		return m_pADO_SQLconnection;
 	}
+	else
+	{
+		// Connect to SQL server failed. Set Connection lost flag.
+		SetRetryConnectTime();
+		m_fIsConnected = FALSE;
+		m_fConnectionLost = TRUE;
+	}
 	return NULL;
 }
-
-//void CAdoSqlServer::CheckSqlConnectionHealth( const char *szLogModuleName )
-//{
-//	if( m_fSqlExcluded || m_fConnectionLost )
-//		return;	// No sql used or connection already lost.
-//
-//	_ConnectionPtr pSqlConn = OpenSqlConnection( szLogModuleName );
-//	if( pSqlConn == NULL )
-//		return;
-//
-//	_RecordsetPtr	pSQLrecs("ADODB.Recordset");
-//	std::string strDBver, strCmd = "SELECT Variable FROM Settings WHERE (Name = 'DB_VERSION')";
-//	try
-//	{
-//		pSQLrecs->Open( (const char *)strCmd, 
-//			_variant_t((IDispatch *)pSqlConn, true),
-//			adOpenForwardOnly, adLockReadOnly, adCmdText);
-//		if( !(pSQLrecs->BOF && pSQLrecs->EndOfFile) )	
-//		{
-//			if( pSQLrecs->Fields->GetItem("Variable")->ActualSize > 0 )
-//				strDBver = pSQLrecs->Fields->GetItem("Variable")->Value;
-//		}
-//	}
-//	catch( _com_error &e )
-//	{
-//		LogComError( e, szLogModuleName );
-//	}
-//	if( pSQLrecs )
-//		if( pSQLrecs->State == adStateOpen )
-//			pSQLrecs->Close();
-//}
 
 BOOL CAdoSqlServer::RetrySqlConnection()
 {
 	if( !m_fConnectionLost )
 		return TRUE;	// connection not lost.
 
-	// Save time of this retry.
-	FILETIME ft;
-	GetSystemTimeAsFileTime(&ft);
-	m_nLastRetryConnectTime = ((__int64)ft.dwHighDateTime << 32) + ft.dwLowDateTime;
+	theLogSys.Add2LogI(MOD_NAME, "Retrying SQL server connect");
+
+	// Save the time of this retry.
+	SetRetryConnectTime();
 
 	m_fRetryingToConnect = TRUE;
 	m_nSQLconnUseCount++;
@@ -140,6 +114,13 @@ BOOL CAdoSqlServer::RetrySqlConnection()
 
 	m_fRetryingToConnect = FALSE;
 	return fResult;
+}
+
+void CAdoSqlServer::SetRetryConnectTime()
+{
+	FILETIME ft;
+	GetSystemTimeAsFileTime(&ft);
+	m_nLastRetryConnectTime = ((__int64)ft.dwHighDateTime << 32) + ft.dwLowDateTime;
 }
 
 int CAdoSqlServer::GetSecondsSinceLastRetry()
