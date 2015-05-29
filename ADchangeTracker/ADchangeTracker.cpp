@@ -5,23 +5,12 @@
 // Name used in Log when 'this' module logs an error.
 #define MOD_NAME "ADchangeTracker"
 
-// Note - NT service code used is on MSDN: https://msdn.microsoft.com/en-us/library/windows/desktop/bb540475(v=vs.85).aspx
-
-#define SVCNAME			L"ADchangeTracker"
-#define SVCDISPNAME		L"Active Directory change tracker"
-#define SVCDESCRIPTION	L"Collects selected Active Directory change events into a SQL database."
-
-/////////////////////////////////////////////////////////////////////////////////////
-// The one and only CADchangeTrackerSvc object
-CADchangeTrackerSvc theService;
-/////////////////////////////////////////////////////////////////////////////////////
-
 int _tmain(int argc, _TCHAR* argv[])
 {
 	theLogSys.InitLogSys(GetModuleHandle(NULL));
 	theLogSys.CreateNewLogFile();
 
-	theLogSys.Add2LogI(MOD_NAME, "_tmain called");
+	theLogSys.Add2LogI(MOD_NAME, "main called");
 
 	// If command-line parameter is "-install", install the service. 
 	// or if command-line parameter is "-uninstall", uninstall the service.
@@ -36,6 +25,9 @@ int _tmain(int argc, _TCHAR* argv[])
 		SvcUninstall();
 		return 0;
 	}
+
+	// Read service configuration file. Note settings are stored in theService object.
+	ReadConfigFile();
 
 	// Connect the main thread of a service process to the service control manager, 
 	// which causes the thread to be the service control dispatcher thread for 
@@ -60,7 +52,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		}
 	}
 
-	theLogSys.Add2LogI(MOD_NAME, "_main ends");
+	theLogSys.Add2LogI(MOD_NAME, "main ends");
 	return 0;
 }
 
@@ -163,119 +155,10 @@ VOID  SvcUninstall()
 	CloseServiceHandle(hSCManager);
 }
 
-//   Entry point for the service - SCM will call this function.
-VOID WINAPI SvcMain(DWORD dwArgc, LPTSTR *lpszArgv)
-{
-	theService.ServiceMain();
-}
-
-// Called by SCM whenever a control code is sent to the service using the ControlService function.
-// Parameters: dwCtrl - control code
-VOID WINAPI SvcCtrlHandler(DWORD dwCtrl)
-{
-	theService.ServiceCtrlHandler(dwCtrl);
-}
-
-CADchangeTrackerSvc::CADchangeTrackerSvc()
-{
-	m_hSvcStatusHandle = 0;
-	memset(&m_sSvcStatus, 0, sizeof(m_sSvcStatus));
-	m_sSvcStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
-	m_dwCheckPoint = 1;
-}
-
-void CADchangeTrackerSvc::ServiceMain()
-{
-	theLogSys.Add2LogI(MOD_NAME, "ServiceMain called");
-
-	// Register the handler function for the service
-	m_hSvcStatusHandle = RegisterServiceCtrlHandler(SVCNAME, SvcCtrlHandler);
-	if (!m_hSvcStatusHandle)
-	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "RegisterServiceCtrlHandler failed", 
-			"", GetLastError());
-		return;
-	}
-
-	// Report initial status to the SCM
-	ReportServiceStatus(SERVICE_START_PENDING, NO_ERROR, 3000);
-
-	// TO_DO: Declare and set any required variables.
-	//   Be sure to periodically call ReportSvcStatus() with 
-	//   SERVICE_START_PENDING. If initialization fails, call
-	//   ReportSvcStatus with SERVICE_STOPPED.
-
-	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-
-	ReadConfigFile();
-
-	if (FALSE == m_eventproc.Init())	// Initialize ADO and other things.
-	{
-		theLogSys.Add2LogE(MOD_NAME, "Init failed", "Service can't start");
-		ReportServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
-		return;
-	}
-
-	// Report running status when initialization is complete.
-	ReportServiceStatus(SERVICE_RUNNING, NO_ERROR, 0);
-	theLogSys.Add2LogI(MOD_NAME, "Service running");
-
-	m_eventproc.Start();
-
-	ReportServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
-	theLogSys.Add2LogI(MOD_NAME, "ServiceMain ends");
-}
-
-void CADchangeTrackerSvc::ServiceCtrlHandler(DWORD dwCtrl)
-{
-	theLogSys.Add2LogI(MOD_NAME, "SvcCtrlHandler called");
-
-	// Handle the requested control code. 
-	switch (dwCtrl)
-	{
-	case SERVICE_CONTROL_STOP:
-		theLogSys.Add2LogI(MOD_NAME, "SERVICE_CONTROL_STOP command received");
-		ReportServiceStatus(SERVICE_STOP_PENDING, NO_ERROR, 0);
-
-		// Signal the service to stop.
-		m_eventproc.SetStopSignal();
-		ReportServiceStatus(m_sSvcStatus.dwCurrentState, NO_ERROR, 0);
-		return;
-
-	case SERVICE_CONTROL_INTERROGATE:
-		break;
-
-	default:
-		break;
-	}
-}
-
-//   Sets the current service status and reports it to the SCM.
-// Parameters:
-//   dwCurrentState - The current state (see SERVICE_STATUS)
-//   dwWin32ExitCode - The system error code
-//   dwWaitHint - Estimated time for pending operation, in milliseconds
-void CADchangeTrackerSvc::ReportServiceStatus(DWORD dwCurrentState, 
-	DWORD dwWin32ExitCode, DWORD dwWaitHint)
-{
-	// Fill in the SERVICE_STATUS structure.
-	m_sSvcStatus.dwCurrentState = dwCurrentState;
-	m_sSvcStatus.dwWin32ExitCode = dwWin32ExitCode;
-	m_sSvcStatus.dwWaitHint = dwWaitHint;
-
-	if (dwCurrentState == SERVICE_START_PENDING)
-		m_sSvcStatus.dwControlsAccepted = 0;
-	else m_sSvcStatus.dwControlsAccepted = SERVICE_ACCEPT_STOP;
-
-	if ((dwCurrentState == SERVICE_RUNNING) || (dwCurrentState == SERVICE_STOPPED))
-		m_sSvcStatus.dwCheckPoint = 0;
-	else m_sSvcStatus.dwCheckPoint = m_dwCheckPoint++; // inc. on every 'STARTING' update.
-
-	// Report the status of the service to the SCM.
-	SetServiceStatus(m_hSvcStatusHandle, &m_sSvcStatus);
-}
-
-BOOL CADchangeTrackerSvc::ReadConfigFile()
+// Read service configuration settings from file.
+// FIle is expected to be UNICODE and in the same folder as the 
+// ADchangeTracker.exe file.
+BOOL ReadConfigFile()
 {
 	// Get module (exefile) name and path.
 	char szFN[MAX_PATH];
@@ -329,7 +212,7 @@ cleanup:
 	return fResult;
 }
 
-void CADchangeTrackerSvc::ProcessConfigFile(BYTE *pFileData, DWORD dwDataLen)
+void ProcessConfigFile(BYTE *pFileData, DWORD dwDataLen)
 {
 	// Check for unicode signature.
 	BOOL fIsUnicode = FALSE;
@@ -358,7 +241,7 @@ void CADchangeTrackerSvc::ProcessConfigFile(BYTE *pFileData, DWORD dwDataLen)
 	}
 }
 
-void CADchangeTrackerSvc::ParseConfigFileLine(TCHAR *szLine)
+void ParseConfigFileLine(TCHAR *szLine)
 {
 	if (szLine[0] == '#')
 		return;				// Ignore comment lines.
@@ -366,7 +249,7 @@ void CADchangeTrackerSvc::ParseConfigFileLine(TCHAR *szLine)
 	TCHAR *setting = _tcstok_s(szLine, L"=", &next);
 	if (!setting)
 		return;
-	EVENT_PROCESSING_CONFIG &config = m_eventproc.GetConfigStruct();
+	EVENT_PROCESSING_CONFIG &config = theService.GetConfigStruct();
 	TCHAR *param = _tcstok_s(NULL, L"\r\n", &next);
 	if (_tcsstr(setting, L"SqlConnString") != NULL)
 	{
@@ -388,7 +271,7 @@ void CADchangeTrackerSvc::ParseConfigFileLine(TCHAR *szLine)
 	}
 }
 
-int CADchangeTrackerSvc::ParseAcceptedIDs(TCHAR *szEventIDs, int *pnarrEvents, int nNumElem)
+int ParseAcceptedIDs(TCHAR *szEventIDs, int *pnarrEvents, int nNumElem)
 {
 	TCHAR szSrc[4096];
 	StringCchCopy(szSrc, sizeof(szSrc), szEventIDs);
@@ -408,7 +291,7 @@ int CADchangeTrackerSvc::ParseAcceptedIDs(TCHAR *szEventIDs, int *pnarrEvents, i
 	return elem;
 }
 
-int CADchangeTrackerSvc::ParseIgnoredEvts(TCHAR *szIgnoredEvts, IGNORE_EVENTS *psarrIgnoreEvents, int nNumElem)
+int ParseIgnoredEvts(TCHAR *szIgnoredEvts, IGNORE_EVENTS *psarrIgnoreEvents, int nNumElem)
 {
 	TCHAR szSrc[4096];
 	StringCchCopy(szSrc, sizeof(szSrc), szIgnoredEvts);
@@ -427,7 +310,7 @@ int CADchangeTrackerSvc::ParseIgnoredEvts(TCHAR *szIgnoredEvts, IGNORE_EVENTS *p
 	return elem;
 }
 
-int CADchangeTrackerSvc::ParseBoolParam(TCHAR *szParam)
+int ParseBoolParam(TCHAR *szParam)
 {
 	TCHAR szSrc[64];
 	StringCchCopy(szSrc, sizeof(szSrc), szParam);

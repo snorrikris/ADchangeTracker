@@ -67,7 +67,7 @@ protected:
 
 	char m_szWorkstationName[128];
 
-	char m_szModuleFilenameBase[MAX_PATH]; // Full path and filename base for log files.
+	char m_szLogFilenameBase[MAX_PATH]; // Full path and filename base for log files.
 									 // Note - "YY-MM-DD_HH-MM-SS.log" is added to name.
 
 	char m_szLogNameBase[MAX_PATH];		// Base name of log files

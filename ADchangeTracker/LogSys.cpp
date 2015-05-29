@@ -157,7 +157,7 @@ BOOL CLogSys::CreateNewLogFile()
 	strftime( szTM, 128, "%Y-%m-%d_%H-%M-%S", &newtime );
 
 	char szFileName[MAX_PATH];
-	strcpy_s( szFileName, sizeof(szFileName), m_szModuleFilenameBase );
+	strcpy_s( szFileName, sizeof(szFileName), m_szLogFilenameBase );
 	strcat_s(szFileName, sizeof(szFileName), szTM);
 	strcat_s(szFileName, sizeof(szFileName), ".log");
 
@@ -186,7 +186,7 @@ void CLogSys::DeleteOldLogFiles( int nOlderThanXdays )
 {
 	char szDelFile[MAX_PATH];
 	char szDirSrch[MAX_PATH];
-	strcpy_s( szDirSrch, sizeof(szDirSrch), m_szModuleFilenameBase );
+	strcpy_s( szDirSrch, sizeof(szDirSrch), m_szLogFilenameBase );
 	strcat_s( szDirSrch, sizeof(szDirSrch), "*.log" );
 
 	// Calculate 'now' - 30 days as FILETIME data structure.
@@ -270,8 +270,8 @@ void CLogSys::Init()
 	char *szFN = m_szModuleFilename;
 	nLen = ::GetModuleFileNameA( m_hModule, szFN, nBufLen );
 
-	strcpy_s( m_szModuleFilenameBase, sizeof(m_szModuleFilenameBase), m_szModuleFilename );
-	szFN = m_szModuleFilenameBase;
+	strcpy_s( m_szLogFilenameBase, sizeof(m_szLogFilenameBase), m_szModuleFilename );
+	szFN = m_szLogFilenameBase;
 	if( nLen )
 	{	// Remove .exe (or .dll) from string
 		while( nLen > 0 && szFN[nLen] != '.' )
@@ -290,7 +290,7 @@ void CLogSys::Init()
 		szFN[nLen] = 0;
 	}
 
-	strcpy_s( m_szLogNameBase, sizeof(m_szLogNameBase), &m_szModuleFilenameBase[nLen + 1] );
+	strcpy_s( m_szLogNameBase, sizeof(m_szLogNameBase), &m_szLogFilenameBase[nLen + 1] );
 	strcpy_s( m_szAppFilename, sizeof(m_szAppFilename), &m_szModuleFilename[nLen + 1] );
 
 	strcpy_s( m_szLogFilePath, sizeof(m_szLogFilePath), m_szModulePath );
@@ -304,9 +304,9 @@ void CLogSys::Init()
 	HANDLE hFind = ::FindFirstFileA( szDirSrch, &stFindFileData );
 	if( hFind != INVALID_HANDLE_VALUE )
 	{
-		strcpy_s(m_szModuleFilenameBase, sizeof(m_szModuleFilenameBase), m_szModulePath);
-		strcat_s(m_szModuleFilenameBase, sizeof(m_szModuleFilenameBase), "\\Logs\\");
-		strcat_s(m_szModuleFilenameBase, sizeof(m_szModuleFilenameBase), m_szLogNameBase);
+		strcpy_s(m_szLogFilenameBase, sizeof(m_szLogFilenameBase), m_szModulePath);
+		strcat_s(m_szLogFilenameBase, sizeof(m_szLogFilenameBase), "\\Logs\\");
+		strcat_s(m_szLogFilenameBase, sizeof(m_szLogFilenameBase), m_szLogNameBase);
 		::FindClose( hFind );
 		strcat_s(m_szLogFilePath, sizeof(m_szLogFilePath), "Logs\\");
 	}
@@ -340,9 +340,9 @@ void CLogSys::Init()
 			strcpy_s(m_szLogFilePath, sizeof(m_szLogFilePath), szLogDir);
 			strcat_s(m_szLogFilePath, sizeof(m_szLogFilePath), "\\");
 
-			strcpy_s(m_szModuleFilenameBase, sizeof(m_szModuleFilenameBase), m_szLogFilePath);
-			strcat_s(m_szModuleFilenameBase, sizeof(m_szModuleFilenameBase), m_szApplication);
-			strcat_s(m_szModuleFilenameBase, sizeof(m_szModuleFilenameBase), "_");
+			strcpy_s(m_szLogFilenameBase, sizeof(m_szLogFilenameBase), m_szLogFilePath);
+			strcat_s(m_szLogFilenameBase, sizeof(m_szLogFilenameBase), m_szApplication);
+			strcat_s(m_szLogFilenameBase, sizeof(m_szLogFilenameBase), "_");
 		}
 	}
 	CoTaskMemFree(static_cast<void*>(pszPath));

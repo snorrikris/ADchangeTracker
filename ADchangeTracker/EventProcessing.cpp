@@ -7,18 +7,105 @@ using namespace pugi;
 // Name used in Log when 'this' module logs an error.
 #define MOD_NAME "Event processing"
 
+//   Entry point for the service - SCM will call this function.
+VOID WINAPI SvcMain(DWORD dwArgc, LPTSTR *lpszArgv)
+{
+	theService.ServiceMain();
+}
+
+// Called by SCM whenever a control code is sent to the service using the ControlService function.
+// Parameters: dwCtrl - control code
+VOID WINAPI SvcCtrlHandler(DWORD dwCtrl)
+{
+	theService.ServiceCtrlHandler(dwCtrl);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+// The one and only CEventProcessing object - the service code.
+CEventProcessing theService;
+/////////////////////////////////////////////////////////////////////////////////////
+
 CEventProcessing::CEventProcessing()
 {
 	m_hSubscription = m_hBookmark = NULL;
 	memset(&m_config, 0, sizeof(m_config));
 	m_config.fIsVerboseLogging = TRUE;
 	m_hEvent_SqlConnLost = m_hEvent_ServiceStop = NULL;
+
+	m_hSvcStatusHandle = 0;
+	memset(&m_sSvcStatus, 0, sizeof(m_sSvcStatus));
+	m_sSvcStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+	m_dwCheckPoint = 1;
 }
 
 CEventProcessing::~CEventProcessing()
 {
 	assert(m_hSubscription == NULL);
 	assert(m_hBookmark == NULL);
+}
+
+void CEventProcessing::ServiceMain()
+{
+	theLogSys.Add2LogI(MOD_NAME, "ServiceMain called");
+
+	// Register the handler function for the service
+	m_hSvcStatusHandle = RegisterServiceCtrlHandler(SVCNAME, SvcCtrlHandler);
+	if (!m_hSvcStatusHandle)
+	{
+		theLogSys.Add2LogEsyserr(MOD_NAME, "RegisterServiceCtrlHandler failed",
+			"", GetLastError());
+		return;
+	}
+
+	// Report initial status to the SCM
+	ReportServiceStatus(SERVICE_START_PENDING, NO_ERROR, 3000);
+
+	// TO_DO: Declare and set any required variables.
+	//   Be sure to periodically call ReportSvcStatus() with 
+	//   SERVICE_START_PENDING. If initialization fails, call
+	//   ReportSvcStatus with SERVICE_STOPPED.
+
+	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+
+	if (FALSE == Init())	// Initialize ADO and other things.
+	{
+		theLogSys.Add2LogE(MOD_NAME, "Init failed", "Service can't start");
+		ReportServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
+		return;
+	}
+
+	// Report running status when initialization is complete.
+	ReportServiceStatus(SERVICE_RUNNING, NO_ERROR, 0);
+	theLogSys.Add2LogI(MOD_NAME, "Service running");
+
+	Start();
+
+	ReportServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
+	theLogSys.Add2LogI(MOD_NAME, "ServiceMain ends");
+}
+
+void CEventProcessing::ServiceCtrlHandler(DWORD dwCtrl)
+{
+	theLogSys.Add2LogI(MOD_NAME, "SvcCtrlHandler called");
+
+	// Handle the requested control code. 
+	switch (dwCtrl)
+	{
+	case SERVICE_CONTROL_STOP:
+		theLogSys.Add2LogI(MOD_NAME, "SERVICE_CONTROL_STOP command received");
+		ReportServiceStatus(SERVICE_STOP_PENDING, NO_ERROR, 0);
+
+		// Signal the service to stop.
+		SetStopSignal();
+		ReportServiceStatus(m_sSvcStatus.dwCurrentState, NO_ERROR, 0);
+		return;
+
+	case SERVICE_CONTROL_INTERROGATE:
+		break;
+
+	default:
+		break;
+	}
 }
 
 BOOL CEventProcessing::Init()
@@ -102,6 +189,31 @@ void CEventProcessing::Start()
 void CEventProcessing::SetStopSignal()
 {
 	SetEvent(m_hEvent_ServiceStop);
+}
+
+//   Sets the current service status and reports it to the SCM.
+// Parameters:
+//   dwCurrentState - The current state (see SERVICE_STATUS)
+//   dwWin32ExitCode - The system error code
+//   dwWaitHint - Estimated time for pending operation, in milliseconds
+void CEventProcessing::ReportServiceStatus(DWORD dwCurrentState,
+	DWORD dwWin32ExitCode, DWORD dwWaitHint)
+{
+	// Fill in the SERVICE_STATUS structure.
+	m_sSvcStatus.dwCurrentState = dwCurrentState;
+	m_sSvcStatus.dwWin32ExitCode = dwWin32ExitCode;
+	m_sSvcStatus.dwWaitHint = dwWaitHint;
+
+	if (dwCurrentState == SERVICE_START_PENDING)
+		m_sSvcStatus.dwControlsAccepted = 0;
+	else m_sSvcStatus.dwControlsAccepted = SERVICE_ACCEPT_STOP;
+
+	if ((dwCurrentState == SERVICE_RUNNING) || (dwCurrentState == SERVICE_STOPPED))
+		m_sSvcStatus.dwCheckPoint = 0;
+	else m_sSvcStatus.dwCheckPoint = m_dwCheckPoint++; // inc. on every 'STARTING' update.
+
+	// Report the status of the service to the SCM.
+	SetServiceStatus(m_hSvcStatusHandle, &m_sSvcStatus);
 }
 
 BOOL CEventProcessing::StartEventSubscription()
