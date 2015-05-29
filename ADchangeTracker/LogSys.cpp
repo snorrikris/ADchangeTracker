@@ -5,7 +5,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////
 // The one and only CLogSys object
-CLogSys theLogSys;
+CLogSys theLog;
 /////////////////////////////////////////////////////////////////////////////////////
 
 CLogSys::CLogSys(void)
@@ -33,21 +33,21 @@ CLogSys::~CLogSys(void)
 }
 
 // Add to log - 'Info' level.
-void CLogSys::Add2LogI( const char *szModule, const char *szLogEvent, 
+void CLogSys::Info( const char *szModule, const char *szLogEvent, 
 						 const char *szDescription /*= 0*/,	const char *szNotes/*= 0*/ )
 {
 	Add2LogLvl( szModule, szLogEvent, "Info", szDescription, szNotes );
 }
 
 // Add to log - 'Warning' level.
-void CLogSys::Add2LogW( const char *szModule, const char *szLogEvent,
+void CLogSys::Warning( const char *szModule, const char *szLogEvent,
 	const char *szDescription/*= 0*/, const char *szNotes/*= 0*/ )
 {
 	Add2LogLvl( szModule, szLogEvent, "Warning", szDescription, szNotes );
 }
 
 // Add to log - 'Error' level.
-void CLogSys::Add2LogE( const char *szModule, const char *szLogEvent, 
+void CLogSys::Error( const char *szModule, const char *szLogEvent, 
 	const char *szDescription/*= 0*/, const char *szNotes/*= 0*/ )
 {
 	Add2LogLvl( szModule, szLogEvent, "Error", szDescription, szNotes );
@@ -102,7 +102,7 @@ void CLogSys::Add2LogLvl( const char *szModule, const char *szLogEvent,
 	::LeaveCriticalSection( &m_critsect );
 }
 
-void CLogSys::Add2LogEsyserr( const char *szModule, const char *szLogEvent, 
+void CLogSys::SysErr( const char *szModule, const char *szLogEvent, 
 	const char *szDescription, DWORD dwSystemErrorCode )
 {
 	LPVOID lpMsgBuf = 0;
@@ -120,7 +120,7 @@ void CLogSys::Add2LogEsyserr( const char *szModule, const char *szLogEvent,
 		sprintf_s( sz, sizeof(sz), "Error code: 0x%.8X - %s", dwSystemErrorCode, lpMsgBuf );
 	else
 		sprintf_s( sz, sizeof(sz), "Error code: 0x%.8X", dwSystemErrorCode );
-	Add2LogE( szModule, szLogEvent, szDescription, sz );
+	Error( szModule, szLogEvent, szDescription, sz );
 
 	::LocalFree(lpMsgBuf);
 }

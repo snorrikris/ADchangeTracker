@@ -48,20 +48,19 @@ CEventProcessing::~CEventProcessing()
 
 void CEventProcessing::ServiceMain()
 {
-	theLogSys.Add2LogI(MOD_NAME, "ServiceMain called");
+	theLog.Info(MOD_NAME, "ServiceMain called");
 
 	// Register the handler function for the service
 	m_hSvcStatusHandle = RegisterServiceCtrlHandler(SVCNAME, SvcCtrlHandler);
 	if (!m_hSvcStatusHandle)
 	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "RegisterServiceCtrlHandler failed",
-			"", GetLastError());
+		theLog.SysErr(MOD_NAME, "RegisterServiceCtrlHandler failed", "", GetLastError());
 		return;
 	}
 
 	// Report initial status to the SCM
 	ReportServiceStatus(SERVICE_START_PENDING, NO_ERROR, 3000);
-	theLogSys.Add2LogI(MOD_NAME, "Service starting");
+	theLog.Info(MOD_NAME, "Service starting");
 
 	// Initialize things needed for service start.
 	BOOL fIsInitialized = TRUE;
@@ -72,53 +71,53 @@ void CEventProcessing::ServiceMain()
 	// Verify that minimum required settings are present.
 	if (_tcslen(m_config.szConnectionString) == 0)
 	{
-		theLogSys.Add2LogE(MOD_NAME, "SQL connection string missing");
+		theLog.Error(MOD_NAME, "SQL connection string missing");
 		fIsInitialized = FALSE;
 	}
 	if (m_config.nNumElemAcceptedEvts == 0)
 	{
-		theLogSys.Add2LogW(MOD_NAME, "List of accepted EventIDs missing", "This service will do nothing");
+		theLog.Warning(MOD_NAME, "List of accepted EventIDs missing", "This service will do nothing");
 		fIsInitialized = FALSE;
 	}
 
 	// Create a event object - that will signal when service should stop.
 	if ((m_hEvent_ServiceStop = CreateEvent(NULL, TRUE, FALSE, NULL)) == NULL)
 	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "Create service stop event failed", "", GetLastError());
+		theLog.SysErr(MOD_NAME, "Create service stop event failed", "", GetLastError());
 		fIsInitialized = FALSE;
 	}
 
 	// Create a event object - that will signal if SQL connection is lost.
 	if ((m_hEvent_SqlConnLost = CreateEvent(NULL, TRUE, FALSE, NULL)) == NULL)
 	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "Create SQL connection lost event failed", "", GetLastError());
+		theLog.SysErr(MOD_NAME, "Create SQL connection lost event failed", "", GetLastError());
 		fIsInitialized = FALSE;
 	}
 
 	// Initialize SQL server connection (not connecting at this time).
 	if (!m_sqlServer.InitSqlConnection(m_config.szConnectionString))
 	{
-		theLogSys.Add2LogE(MOD_NAME, "Initialize SQL ADO failed");
+		theLog.Error(MOD_NAME, "Initialize SQL ADO failed");
 		fIsInitialized = FALSE;
 	}
 
 	if (FALSE == fIsInitialized)	// Initialize failed - service can't start.
 	{
-		theLogSys.Add2LogE(MOD_NAME, "Initialize service failed", "Service can't start");
+		theLog.Error(MOD_NAME, "Initialize service failed", "Service can't start");
 		ReportServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
 		return;
 	}
 
 	// Report running status when initialization is complete.
 	ReportServiceStatus(SERVICE_RUNNING, NO_ERROR, 0);
-	theLogSys.Add2LogI(MOD_NAME, "Service running");
+	theLog.Info(MOD_NAME, "Service running");
 
 	///////////////////////////////////////////////////////////////////////////
 	// Call service start function.
 	Start();
 	// The Start function returns when the service is stopping.
 
-	theLogSys.Add2LogI(MOD_NAME, "Service is stopping");
+	theLog.Info(MOD_NAME, "Service is stopping");
 
 	StopEventSubscription();
 
@@ -133,18 +132,18 @@ void CEventProcessing::ServiceMain()
 	CoUninitialize();
 
 	ReportServiceStatus(SERVICE_STOPPED, NO_ERROR, 0);
-	theLogSys.Add2LogI(MOD_NAME, "Service stopped");
+	theLog.Info(MOD_NAME, "Service stopped");
 }
 
 void CEventProcessing::ServiceCtrlHandler(DWORD dwCtrl)
 {
-	theLogSys.Add2LogI(MOD_NAME, "SvcCtrlHandler called");
+	theLog.Info(MOD_NAME, "SvcCtrlHandler called");
 
 	// Handle the requested control code. 
 	switch (dwCtrl)
 	{
 	case SERVICE_CONTROL_STOP:
-		theLogSys.Add2LogI(MOD_NAME, "SERVICE_CONTROL_STOP command received");
+		theLog.Info(MOD_NAME, "SERVICE_CONTROL_STOP command received");
 		ReportServiceStatus(SERVICE_STOP_PENDING, NO_ERROR, 1000);
 
 		// Signal the service to stop.
@@ -185,7 +184,7 @@ void CEventProcessing::Start()
 		if (dwWaitResult == WAIT_OBJECT_0)
 		{
 			// Stop event is in signaled state.
-			theLogSys.Add2LogI(MOD_NAME, "Stop event signaled");
+			theLog.Info(MOD_NAME, "Stop event signaled");
 			break;	// Stop the service.
 		}
 
@@ -238,7 +237,7 @@ void CEventProcessing::ReportServiceStatus(DWORD dwCurrentState,
 
 BOOL CEventProcessing::StartEventSubscription()
 {
-	theLogSys.Add2LogI(MOD_NAME, "StartEventSubscription called");
+	theLog.Info(MOD_NAME, "StartEventSubscription called");
 
 	// Get the saved bookmark.
 	GetBookmark();
@@ -256,7 +255,7 @@ BOOL CEventProcessing::StartEventSubscription()
 		EvtSubscribeStartAfterBookmark);
 	if (NULL == m_hSubscription)
 	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "EvtSubscribe call failed", "", GetLastError());
+		theLog.SysErr(MOD_NAME, "EvtSubscribe call failed", "", GetLastError());
 		fReturn = FALSE;
 	}
 	return fReturn;
@@ -267,7 +266,7 @@ void CEventProcessing::StopEventSubscription()
 	if (!m_hSubscription)
 		return;
 
-	theLogSys.Add2LogI(MOD_NAME, "StopEventSubscription called");
+	theLog.Info(MOD_NAME, "StopEventSubscription called");
 
 	SaveBookmark();
 
@@ -298,7 +297,7 @@ DWORD WINAPI CEventProcessing::SubscriptionCallback(EVT_SUBSCRIBE_NOTIFY_ACTION 
 		break;
 
 	default:
-		theLogSys.Add2LogW(MOD_NAME, "SubscriptionCallback: Unknown action");
+		theLog.Warning(MOD_NAME, "SubscriptionCallback: Unknown action");
 	}
 	return ERROR_SUCCESS; // The service ignores the returned status.
 }
@@ -322,15 +321,14 @@ void CEventProcessing::ProcessEvent(EVT_HANDLE hEvent)
 			}
 			else
 			{
-				theLogSys.Add2LogE(MOD_NAME, "malloc failed in function ProcessEvent");
+				theLog.Error(MOD_NAME, "malloc failed in function ProcessEvent");
 				goto cleanup;
 			}
 		}
 
 		if (ERROR_SUCCESS != (status = GetLastError()))
 		{
-			theLogSys.Add2LogEsyserr(MOD_NAME, "EvtRender failed in function ProcessEvent",
-				"", status);
+			theLog.SysErr(MOD_NAME, "EvtRender failed in function ProcessEvent", "", status);
 			goto cleanup;
 		}
 	}
@@ -341,7 +339,7 @@ void CEventProcessing::ProcessEvent(EVT_HANDLE hEvent)
 		if (!EvtUpdateBookmark(m_hBookmark, hEvent))
 		{
 			status = GetLastError();
-			theLogSys.Add2LogEsyserr(MOD_NAME,
+			theLog.SysErr(MOD_NAME,
 				"EvtUpdateBookmark failed in SubscriptionCallback function", "", status);
 			goto cleanup;
 		}
@@ -417,8 +415,7 @@ BOOL CEventProcessing::GetBookmark()
 		0, KEY_READ, &hkey);
 	if (ERROR_SUCCESS == lResult)
 	{   // read the bookmark value
-		lResult = RegQueryValueEx(hkey, L"Bookmark", NULL, &dwType,
-			(BYTE*)szBookmark, &dataSize);
+		lResult = RegQueryValueEx(hkey, L"Bookmark", NULL, &dwType, (BYTE*)szBookmark, &dataSize);
 		if (ERROR_SUCCESS == lResult)
 		{
 			pBookmarkXml = szBookmark;
@@ -426,16 +423,14 @@ BOOL CEventProcessing::GetBookmark()
 	}
 	if (lResult != ERROR_SUCCESS && lResult != ERROR_FILE_NOT_FOUND)
 	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "Read Xml event log bookmark from registry failed",
-			"", lResult);
+		theLog.SysErr(MOD_NAME, "Read Xml event log bookmark from registry failed", "", lResult);
 	}
 
 	BOOL fReturn = TRUE;
 	m_hBookmark = EvtCreateBookmark(pBookmarkXml);
 	if (NULL == m_hBookmark)
 	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "Create event log bookmark failed",
-			"", GetLastError());
+		theLog.SysErr(MOD_NAME, "Create event log bookmark failed", "", GetLastError());
 		fReturn = FALSE;
 	}
 
@@ -469,7 +464,7 @@ BOOL CEventProcessing::SaveBookmark()
 			}
 			else
 			{
-				theLogSys.Add2LogE(MOD_NAME, "malloc failed in SaveBookmark function");
+				theLog.Error(MOD_NAME, "malloc failed in SaveBookmark function");
 				status = ERROR_OUTOFMEMORY;
 				goto cleanup;
 			}
@@ -477,8 +472,7 @@ BOOL CEventProcessing::SaveBookmark()
 
 		if (ERROR_SUCCESS != (status = GetLastError()))
 		{
-			theLogSys.Add2LogEsyserr(MOD_NAME, "EvtRender failed in SaveBookmark function",
-				"", status);
+			theLog.SysErr(MOD_NAME, "EvtRender failed in SaveBookmark function", "", status);
 			goto cleanup;
 		}
 	}
@@ -489,8 +483,7 @@ BOOL CEventProcessing::SaveBookmark()
 		0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hkey, &dwDisp);
 	if (ERROR_SUCCESS != lResult)
 	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "RegCreateKeyEx failed in SaveBookmark function",
-			"", lResult);
+		theLog.SysErr(MOD_NAME, "RegCreateKeyEx failed in SaveBookmark function", "", lResult);
 		goto cleanup;
 	}
 
@@ -499,8 +492,7 @@ BOOL CEventProcessing::SaveBookmark()
 	lResult = RegSetValueEx(hkey, L"Bookmark", 0, REG_SZ, (BYTE *)pBookmarkXml, dataSize);
 	if (lResult != ERROR_SUCCESS)
 	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "RegSetValueEx failed in SaveBookmark function",
-			"", lResult);
+		theLog.SysErr(MOD_NAME, "RegSetValueEx failed in SaveBookmark function", "", lResult);
 		goto cleanup;
 	}
 	fReturn = TRUE;
@@ -544,6 +536,6 @@ void CEventProcessing::LogInfo(const char *szLogEvent,
 {
 	if (!m_config.fIsVerboseLogging)
 		return;
-	theLogSys.Add2LogI(MOD_NAME, szLogEvent, szDescription, szNotes);
+	theLog.Info(MOD_NAME, szLogEvent, szDescription, szNotes);
 }
 

@@ -7,10 +7,10 @@
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	theLogSys.InitLogSys(GetModuleHandle(NULL));
-	theLogSys.CreateNewLogFile();
+	theLog.InitLogSys(GetModuleHandle(NULL));
+	theLog.CreateNewLogFile();
 
-	theLogSys.Add2LogI(MOD_NAME, "main called");
+	theLog.Info(MOD_NAME, "main called");
 
 	// If command-line parameter is "-install", install the service. 
 	// or if command-line parameter is "-uninstall", uninstall the service.
@@ -41,10 +41,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (!StartServiceCtrlDispatcher(DispatchTable))
 	{
 		DWORD dwError = GetLastError();
-		theLogSys.Add2LogEsyserr(MOD_NAME, "StartServiceCtrlDispatcher call failed", "", dwError);
+		theLog.SysErr(MOD_NAME, "StartServiceCtrlDispatcher call failed", "", dwError);
 		if (ERROR_FAILED_SERVICE_CONTROLLER_CONNECT == dwError)
 		{
-			theLogSys.Add2LogW(MOD_NAME, "Attempt to run service as console application");
+			theLog.Warning(MOD_NAME, "Attempt to run service as console application");
 			printf("This is a service.\n"
 				"To install or uninstall the service run a Command Prompt as a Administrator\n"
 				"Do: ADchangeTracker -install\n"
@@ -52,7 +52,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		}
 	}
 
-	theLogSys.Add2LogI(MOD_NAME, "main ends");
+	theLog.Info(MOD_NAME, "main ends");
 	return 0;
 }
 
@@ -63,7 +63,7 @@ VOID SvcInstall()
 	TCHAR szPath[MAX_PATH];
 	if (!GetModuleFileName(GetModuleHandle(NULL), szPath, MAX_PATH))
 	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "Cannot install service", "", GetLastError());
+		theLog.SysErr(MOD_NAME, "Cannot install service", "", GetLastError());
 		printf("Cannot install service (%d)\n", GetLastError());
 		return;
 	}
@@ -75,7 +75,7 @@ VOID SvcInstall()
 
 	if (NULL == hSCManager)
 	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "OpenSCManager failed", "", GetLastError());
+		theLog.SysErr(MOD_NAME, "OpenSCManager failed", "", GetLastError());
 		printf("OpenSCManager failed (%d)\n", GetLastError());
 		return;
 	}
@@ -97,7 +97,7 @@ VOID SvcInstall()
 
 	if (hService == NULL)
 	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "CreateService failed", "", GetLastError());
+		theLog.SysErr(MOD_NAME, "CreateService failed", "", GetLastError());
 		printf("CreateService failed (%d)\n", GetLastError());
 		CloseServiceHandle(hSCManager);
 		return;
@@ -108,7 +108,7 @@ VOID SvcInstall()
 		SERVICE_DESCRIPTION sCfgDesc = { SVCDESCRIPTION };
 		if (!ChangeServiceConfig2(hService, SERVICE_CONFIG_DESCRIPTION, &sCfgDesc))
 		{
-			theLogSys.Add2LogW(MOD_NAME, "Set service description failed");
+			theLog.Warning(MOD_NAME, "Set service description failed");
 		}
 		// SVCDESCRIPTION
 		printf("Service installed successfully\n");
@@ -171,32 +171,32 @@ BOOL ReadConfigFile()
 	}
 	else
 	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "Failed to get module name in function ReadConfigFile", "", GetLastError());
+		theLog.SysErr(MOD_NAME, "Failed to get module name in function ReadConfigFile", "", GetLastError());
 		return FALSE;
 	}
 	HANDLE hFile = CreateFileA(szFN, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (INVALID_HANDLE_VALUE == hFile)
 	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "Failed to open service config file", szFN, GetLastError());
+		theLog.SysErr(MOD_NAME, "Failed to open service config file", szFN, GetLastError());
 		return FALSE;
 	}
 	LARGE_INTEGER nFileSize;
 	if (!GetFileSizeEx(hFile, &nFileSize))
 	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "Failed to get size of service config file", szFN, GetLastError());
+		theLog.SysErr(MOD_NAME, "Failed to get size of service config file", szFN, GetLastError());
 		return FALSE;
 	}
 	BYTE *pFileData = (BYTE *)malloc(nFileSize.LowPart + 2);
 	if (NULL == pFileData)
 	{
-		theLogSys.Add2LogE(MOD_NAME, "Failed to allocate memory for service config file", szFN);
+		theLog.Error(MOD_NAME, "Failed to allocate memory for service config file", szFN);
 		return FALSE;
 	}
 	BOOL fResult = TRUE;
 	DWORD dwBytesRead = 0;
 	if (!ReadFile(hFile, pFileData, nFileSize.LowPart, &dwBytesRead, NULL))
 	{
-		theLogSys.Add2LogEsyserr(MOD_NAME, "Failed to read service config file", szFN, GetLastError());
+		theLog.SysErr(MOD_NAME, "Failed to read service config file", szFN, GetLastError());
 		fResult = FALSE;
 		goto cleanup;
 	}
@@ -225,7 +225,7 @@ void ProcessConfigFile(BYTE *pFileData, DWORD dwDataLen)
 	}
 	if (!fIsUnicode)
 	{
-		theLogSys.Add2LogE(MOD_NAME, "Service config file is not UNICODE");
+		theLog.Error(MOD_NAME, "Service config file is not UNICODE");
 		return;
 	}
 

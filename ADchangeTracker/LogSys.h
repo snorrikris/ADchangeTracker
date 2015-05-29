@@ -25,15 +25,15 @@ public:
 	void DeleteOldLogFiles( int nOlderThanXdays );
 
 	// Add to log - 'Info' level.
-	void Add2LogI( const char *szModule, const char *szLogEvent, 
+	void Info( const char *szModule, const char *szLogEvent, 
 		const char *szDescription = 0, const char *szNotes = 0 );
 
 	// Add to log - 'Warning' level.
-	void Add2LogW( const char *szModule, const char *szLogEvent, 
+	void Warning( const char *szModule, const char *szLogEvent, 
 		const char *szDescription = 0, const char *szNotes = 0 );
 
 	// Add to log - 'Error' level.
-	void Add2LogE( const char *szModule, const char *szLogEvent, 
+	void Error( const char *szModule, const char *szLogEvent, 
 		const char *szDescription = 0, const char *szNotes = 0 );
 
 	// Add to log - custom level.
@@ -43,7 +43,7 @@ public:
 	// Add to log - 'Error' level. WIN32 system error code.
 	// The 'Notes' field will contain the system error code and description.
 	// dwSystemErrorCode = error code from ::GetLastError().
-	void Add2LogEsyserr( const char *szModule, const char *szLogEvent, 
+	void SysErr( const char *szModule, const char *szLogEvent, 
 		const char *szDescription, DWORD dwSystemErrorCode );
 
 	// By default application name is set to the exe or dll filename.
@@ -85,7 +85,7 @@ protected:
 						// Used when GetModuleFileName called.
 };
 
-// Note 'theLogSys' object is instantiated only once and it is global data.
+// Note 'theLog' object is instantiated only once and it is global data.
 // All threads in 'this' application/service can use it for logging to file.
-extern CLogSys theLogSys;
+extern CLogSys theLog;
 

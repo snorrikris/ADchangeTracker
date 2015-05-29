@@ -30,7 +30,7 @@ BOOL CAdoSqlServer::InitSqlConnection(LPWSTR szConnectionString)
 		hr = m_pADO_SQLconnection.CreateInstance(__uuidof(Connection));
 		if( FAILED(hr) )
 		{
-			theLogSys.Add2LogEsyserr(MOD_NAME, "ADO CreateInstance FAILED", "", hr);
+			theLog.SysErr(MOD_NAME, "ADO CreateInstance FAILED", "", hr);
 			return FALSE;
 		}
 	}
@@ -90,7 +90,7 @@ BOOL CAdoSqlServer::RetrySqlConnection()
 	if( !m_fConnectionLost )
 		return TRUE;	// connection not lost.
 
-	theLogSys.Add2LogI(MOD_NAME, "Retrying SQL server connect");
+	theLog.Info(MOD_NAME, "Retrying SQL server connect");
 
 	// Save the time of this retry.
 	SetRetryConnectTime();
@@ -107,7 +107,7 @@ BOOL CAdoSqlServer::RetrySqlConnection()
 		// Call usp_CheckConnection to check SQL connection health.
 		if (Call_usp_CheckConnection())
 		{
-			theLogSys.Add2LogI(MOD_NAME, "SQL server re-connected");
+			theLog.Info(MOD_NAME, "SQL server re-connected");
 			fResult = TRUE;
 		}
 	}
@@ -209,7 +209,7 @@ char szTmp[1024];
 			sprintf_s( szTmp, sizeof(szTmp), "Error number: %x\t%s\n", pErr->Number, 
 				(LPCSTR)pErr->Description );
 
-			theLogSys.Add2LogE( MOD_NAME, "SQL provider error", szTmp, "" );
+			theLog.Error( MOD_NAME, "SQL provider error", szTmp, "" );
         }
     }
 }
@@ -227,7 +227,7 @@ void CAdoSqlServer::LogComError( _com_error &e )
 
 	//BOOL fAlarm = ( m_fRetryingToConnect ) ? FALSE : TRUE;
 
-	theLogSys.Add2LogE( MOD_NAME, "ADO com error", szDesc, (LPCSTR)bstrDescription );
+	theLog.Error( MOD_NAME, "ADO com error", szDesc, (LPCSTR)bstrDescription );
 
 	//vector<string> ProviderErrors = GetProviderErrors(TRUE);
 	//int nProvErrors = ProviderErrors.size();
@@ -296,7 +296,7 @@ void CAdoSqlServer::LogComError( _com_error &e )
 			m_nLastRetryConnectTime = ((__int64)ft.dwHighDateTime << 32) + ft.dwLowDateTime;
 
 			m_nRetryConnectCount = 0;
-			theLogSys.Add2LogE( MOD_NAME, "Connection to SQL server lost", 
+			theLog.Error( MOD_NAME, "Connection to SQL server lost", 
 				"", "" );
 		}
 	}
