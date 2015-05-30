@@ -49,6 +49,8 @@ public:
 	// By default application name is set to the exe or dll filename.
 	void SetApplicationName( const char *szApp );
 
+	char *GetLogPath() { return m_szLogFilePath; }
+
 protected:
 	void SaveAndCloseLogFile();
 	void WriteToLogFile( const char *szString );

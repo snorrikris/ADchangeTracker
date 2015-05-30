@@ -253,6 +253,7 @@ void ParseConfigFileLine(TCHAR *szLine)
 	TCHAR *param = _tcstok_s(NULL, L"\r\n", &next);
 	if (_tcsstr(setting, L"SqlConnString") != NULL)
 	{
+		// TODO: trim white space.
 		StringCchCopy(config.szConnectionString, sizeof(config.szConnectionString), param);
 	}
 	else if (_tcsstr(setting, L"AcceptedEventIDs") != NULL)

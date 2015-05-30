@@ -403,28 +403,55 @@ BOOL CEventProcessing::FilterAndSendEventToSql(LPWSTR pXML, DWORD dwXMLlen)
 
 BOOL CEventProcessing::GetBookmark()
 {
-	DWORD status = ERROR_SUCCESS;
 	LPWSTR pBookmarkXml = NULL;
+	BYTE *pFileData = NULL;
+	HANDLE hFile = NULL;
 
-	// Set pBookmarkXml to the XML string that you persisted in SaveBookmark.
-	DWORD dwType;
-	WCHAR szBookmark[1024] = { 0 };
-	DWORD dataSize = sizeof(szBookmark);
-	HKEY hkey = 0;
-	long lResult = RegOpenKeyEx(HKEY_LOCAL_MACHINE, L"SOFTWARE\\ADchangeTracker\\",
-		0, KEY_READ, &hkey);
-	if (ERROR_SUCCESS == lResult)
-	{   // read the bookmark value
-		lResult = RegQueryValueEx(hkey, L"Bookmark", NULL, &dwType, (BYTE*)szBookmark, &dataSize);
-		if (ERROR_SUCCESS == lResult)
-		{
-			pBookmarkXml = szBookmark;
-		}
-	}
-	if (lResult != ERROR_SUCCESS && lResult != ERROR_FILE_NOT_FOUND)
+	// Read bookmark from a file (in log folder).
+	char szBookmarkFile[MAX_PATH];
+	strcpy_s(szBookmarkFile, theLog.GetLogPath());
+	strcat_s(szBookmarkFile, "Bookmark.bin");
+	hFile = CreateFileA(szBookmarkFile, GENERIC_READ, 0, NULL, OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL, NULL);
+	if (INVALID_HANDLE_VALUE == hFile)
 	{
-		theLog.SysErr(MOD_NAME, "Read Xml event log bookmark from registry failed", "", lResult);
+		DWORD dwError = GetLastError();
+		if (ERROR_FILE_NOT_FOUND == dwError)
+		{
+			theLog.Info(MOD_NAME, "Bookmark file not found", szBookmarkFile);
+		}
+		else
+		{
+			theLog.SysErr(MOD_NAME, "Read file failed in GetBookmark function",
+				szBookmarkFile, dwError);
+		}
+		hFile = NULL;
+		goto no_bookmark_file;
 	}
+	LARGE_INTEGER nFileSize;
+	if (!GetFileSizeEx(hFile, &nFileSize))
+	{
+		theLog.SysErr(MOD_NAME, "Failed to get size of Bookmark file", szBookmarkFile, GetLastError());
+		goto no_bookmark_file;
+	}
+	// Allocate memory for bookmark + 2 bytes for terminating 0x00
+	pFileData = (BYTE *)malloc(nFileSize.LowPart + 2);
+	if (NULL == pFileData)
+	{
+		theLog.Error(MOD_NAME, "Failed to allocate memory for Boommark", szBookmarkFile);
+		return FALSE;
+		goto no_bookmark_file;
+	}
+	DWORD dwBytesRead = 0;
+	if (!ReadFile(hFile, pFileData, nFileSize.LowPart, &dwBytesRead, NULL))
+	{
+		theLog.SysErr(MOD_NAME, "Failed to read Bookmark file", szBookmarkFile, GetLastError());
+		goto no_bookmark_file;
+	}
+	*(WORD *)(pFileData + dwBytesRead) = 0;	// Terminate data with 0x00.
+	pBookmarkXml = (LPWSTR)pFileData;
+
+no_bookmark_file:	// Note - bookmark is created "blank" if no bookmark file.
 
 	BOOL fReturn = TRUE;
 	m_hBookmark = EvtCreateBookmark(pBookmarkXml);
@@ -434,10 +461,12 @@ BOOL CEventProcessing::GetBookmark()
 		fReturn = FALSE;
 	}
 
-	if (hkey)
-		RegCloseKey(hkey);
+	if (pFileData)
+		free(pFileData);
+	if (hFile)
+		CloseHandle(hFile);
 
-	return fReturn;	// Note - reading registry status is ignored.
+	return fReturn;
 }
 
 BOOL CEventProcessing::SaveBookmark()
@@ -450,6 +479,7 @@ BOOL CEventProcessing::SaveBookmark()
 	HKEY hkey = 0;
 	BOOL fReturn = FALSE;
 
+	// Render current Bookmark as XML (UNICODE)
 	if (!EvtRender(NULL, m_hBookmark, EvtRenderBookmark, dwBufferSize, pBookmarkXml, 
 		&dwBufferUsed, &dwPropertyCount))
 	{
@@ -477,32 +507,31 @@ BOOL CEventProcessing::SaveBookmark()
 		}
 	}
 
-	// Save bookmark to the registry.
-	DWORD dwDisp;
-	LONG lResult = RegCreateKeyEx(HKEY_LOCAL_MACHINE, L"SOFTWARE\\ADchangeTracker\\",
-		0, NULL, REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hkey, &dwDisp);
-	if (ERROR_SUCCESS != lResult)
+	// Save bookmark to a file (in log folder).
+	char szBookmarkFile[MAX_PATH];
+	strcpy_s(szBookmarkFile, theLog.GetLogPath());
+	strcat_s(szBookmarkFile, "Bookmark.bin");
+	HANDLE hFile = CreateFileA(szBookmarkFile, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+		FILE_ATTRIBUTE_NORMAL, NULL);
+	if (INVALID_HANDLE_VALUE == hFile)
 	{
-		theLog.SysErr(MOD_NAME, "RegCreateKeyEx failed in SaveBookmark function", "", lResult);
+		theLog.SysErr(MOD_NAME, "Create file failed in SaveBookmark function",
+			szBookmarkFile, GetLastError());
 		goto cleanup;
 	}
+	DWORD dwBytesWritten = 0;
+	if (!WriteFile(hFile, pBookmarkXml, dwBufferUsed, &dwBytesWritten, NULL))
+	{
+		theLog.SysErr(MOD_NAME, "Write file failed in SaveBookmark function",
+			szBookmarkFile, GetLastError());
+	}
+	CloseHandle(hFile);
 
-	DWORD keyType = 0;
-	DWORD dataSize = (wcslen(pBookmarkXml) * 2) + 2;
-	lResult = RegSetValueEx(hkey, L"Bookmark", 0, REG_SZ, (BYTE *)pBookmarkXml, dataSize);
-	if (lResult != ERROR_SUCCESS)
-	{
-		theLog.SysErr(MOD_NAME, "RegSetValueEx failed in SaveBookmark function", "", lResult);
-		goto cleanup;
-	}
-	fReturn = TRUE;
+	fReturn = TRUE;	// Save Bookmark OK.
 
 cleanup:
 	if (pBookmarkXml)
 		free(pBookmarkXml);
-
-	if (hkey)
-		RegCloseKey(hkey);
 
 	return fReturn;
 }
