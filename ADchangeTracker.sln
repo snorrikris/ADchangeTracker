@@ -10,6 +10,11 @@ Project("{6141683F-8A12-4E36-9623-2EB02B2C2303}") = "SetupADchangeTracker", "Set
 		{81D6B6CD-EB97-4999-8AF0-4DB4C0E2A4A0} = {81D6B6CD-EB97-4999-8AF0-4DB4C0E2A4A0}
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{E32453DD-8EC4-4608-B69D-41A6834E226A}"
+	ProjectSection(SolutionItems) = preProject
+		ADchangeTracker\Readme.rtf = ADchangeTracker\Readme.rtf
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		CD_ROM|Win32 = CD_ROM|Win32
