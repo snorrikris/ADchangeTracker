@@ -134,6 +134,16 @@ void CLogSys::SetApplicationName( const char *szApp )
 	::LeaveCriticalSection( &m_critsect );
 }
 
+void CLogSys::SetDaysToKeepOldLogFiles(int nDays)
+{
+	::EnterCriticalSection( &m_critsect );
+
+	if (nDays >= 1)
+		m_nDaysToKeepOldLogFiles = nDays;
+
+	::LeaveCriticalSection( &m_critsect );
+}
+
 BOOL CLogSys::CreateNewLogFile()
 {
 	::EnterCriticalSection( &m_critsect );

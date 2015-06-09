@@ -51,6 +51,10 @@ public:
 
 	char *GetLogPath() { return m_szLogFilePath; }
 
+	// Set number of days to keep old log files (mi.n is 1 day).
+	// Note - old files are deleted when CreateNewLogFile is called.
+	void SetDaysToKeepOldLogFiles(int nDays);
+
 protected:
 	void SaveAndCloseLogFile();
 	void WriteToLogFile( const char *szString );

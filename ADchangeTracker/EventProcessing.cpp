@@ -108,6 +108,9 @@ void CEventProcessing::ServiceMain()
 		return;
 	}
 
+	// Set days to keep old log files (note setting kicks in next time create new log file is called).
+	theLog.SetDaysToKeepOldLogFiles(m_config.nDaysToKeepOldLogFiles);
+
 	// Report running status when initialization is complete.
 	ReportServiceStatus(SERVICE_RUNNING, NO_ERROR, 0);
 	theLog.Info(MOD_NAME, "Service running");

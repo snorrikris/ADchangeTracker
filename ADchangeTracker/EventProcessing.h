@@ -28,6 +28,8 @@ typedef struct tagEvtProcConf
 	TCHAR szConnectionString[1024];		// SQL connection string.
 
 	BOOL fIsVerboseLogging;				// TRUE when log level is verbose.
+
+	int nDaysToKeepOldLogFiles;			// Number of days to keep old log files.
 }	
 EVENT_PROCESSING_CONFIG;
 

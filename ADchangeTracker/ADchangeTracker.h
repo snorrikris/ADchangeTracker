@@ -11,3 +11,4 @@ void ParseConfigFileLine(TCHAR *szLine);
 int ParseAcceptedIDs(TCHAR *szEventIDs, int *pnarrEvents, int nNumElem);
 int ParseIgnoredEvts(TCHAR *szIgnoredEvts, IGNORE_EVENTS *psarrIgnoreEvents, int nNumElem);
 BOOL ParseBoolParam(TCHAR *szParam);
+int ParseIntParam(TCHAR *szParam);

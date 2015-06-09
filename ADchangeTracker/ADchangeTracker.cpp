@@ -270,6 +270,10 @@ void ParseConfigFileLine(TCHAR *szLine)
 	{
 		config.fIsVerboseLogging = ParseBoolParam(param);
 	}
+	else if (_tcsstr(setting, L"DaysToKeepOldLogFiles") != NULL)
+	{
+		config.nDaysToKeepOldLogFiles = ParseIntParam(param);
+	}
 }
 
 int ParseAcceptedIDs(TCHAR *szEventIDs, int *pnarrEvents, int nNumElem)
@@ -311,7 +315,7 @@ int ParseIgnoredEvts(TCHAR *szIgnoredEvts, IGNORE_EVENTS *psarrIgnoreEvents, int
 	return elem;
 }
 
-int ParseBoolParam(TCHAR *szParam)
+BOOL ParseBoolParam(TCHAR *szParam)
 {
 	TCHAR szSrc[64];
 	StringCchCopy(szSrc, sizeof(szSrc), szParam);
@@ -323,5 +327,10 @@ int ParseBoolParam(TCHAR *szParam)
 	if (_tcsstr(szSrc, L"on") != NULL)
 		return TRUE;
 	return FALSE;
+}
+
+int ParseIntParam(TCHAR *szParam)
+{
+	return _tstoi(szParam);
 }
 
