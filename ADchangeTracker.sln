@@ -12,6 +12,10 @@ Project("{6141683F-8A12-4E36-9623-2EB02B2C2303}") = "SetupADchangeTracker", "Set
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{E32453DD-8EC4-4608-B69D-41A6834E226A}"
 	ProjectSection(SolutionItems) = preProject
+		ADchangeTracker\AD_Events.rdl = ADchangeTracker\AD_Events.rdl
+		ADchangeTracker\CreateAD_DWdatabase.sql = ADchangeTracker\CreateAD_DWdatabase.sql
+		ADchangeTracker\CreateLogins.sql = ADchangeTracker\CreateLogins.sql
+		ADchangeTracker\EventXml.rdl = ADchangeTracker\EventXml.rdl
 		ADchangeTracker\Readme.rtf = ADchangeTracker\Readme.rtf
 	EndProjectSection
 EndProject
