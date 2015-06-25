@@ -76,9 +76,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="Old Event stuff.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="ADchangeTracker.h" />
     <ClInclude Include="AdoSqlServer.h" />
     <ClInclude Include="EventProcessing.h" />

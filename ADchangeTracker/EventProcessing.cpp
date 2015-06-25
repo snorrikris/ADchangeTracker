@@ -151,7 +151,6 @@ void CEventProcessing::ServiceCtrlHandler(DWORD dwCtrl)
 
 		// Signal the service to stop.
 		SetEvent(m_hEvent_ServiceStop);
-		//ReportServiceStatus(m_sSvcStatus.dwCurrentState, NO_ERROR, 0);
 		return;
 
 	case SERVICE_CONTROL_INTERROGATE:
@@ -183,7 +182,6 @@ void CEventProcessing::Start()
 		DWORD dwWaitResult = WaitForMultipleObjects(dwNumEvents, harrEvents, FALSE, INFINITE);
 
 		// Check whether to stop the service.
-		//if (WaitForSingleObject(m_hEvent_ServiceStop, 0) == WAIT_OBJECT_0)
 		if (dwWaitResult == WAIT_OBJECT_0)
 		{
 			// Stop event is in signaled state.
@@ -192,7 +190,6 @@ void CEventProcessing::Start()
 		}
 
 		// m_hEvent_SqlConnLost event is in signaled state until SQL connection regained.
-		//if (WaitForSingleObject(m_hEvent_SqlConnLost, 0) == WAIT_OBJECT_0)
 		if (dwWaitResult == (WAIT_OBJECT_0 + 1))
 		{
 			// Stop event subscription - (if needed).

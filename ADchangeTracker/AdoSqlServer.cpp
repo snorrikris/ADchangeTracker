@@ -1,5 +1,4 @@
 #include "StdAfx.h"
-//using namespace std;
 #include "AdoSqlServer.h"
 #include "LogSys.h"
 
@@ -100,8 +99,6 @@ BOOL CAdoSqlServer::RetrySqlConnection()
 
 	BOOL fResult = FALSE;
 	_ConnectionPtr pSqlConn = OpenSqlConnection();
-	//if( pSqlConn == NULL )
-	//	return;
 	if (m_fIsConnected)
 	{
 		// Call usp_CheckConnection to check SQL connection health.
@@ -129,7 +126,6 @@ int CAdoSqlServer::GetSecondsSinceLastRetry()
 	GetSystemTimeAsFileTime(&sCurTime);
 	__int64 curtime = ((__int64)sCurTime.dwHighDateTime << 32) + sCurTime.dwLowDateTime;
 	__int64 difftime = curtime - m_nLastRetryConnectTime;
-	//__int64 retrytout = 60 * 1000 * 1000 * 10;	// 60 sec * 1000 mS * 1000 uS * 10 (10 * 100nS = 1 uS).
 	__int64 onesec = 1000 * 1000 * 10;	// 1000 mS * 1000 uS * 10 (10 * 100nS = 1 uS).
 	int secs = (int)(difftime / onesec);
 	if (secs < 0)
@@ -219,69 +215,14 @@ void CAdoSqlServer::LogComError( _com_error &e )
     _bstr_t bstrSource(e.Source());
     _bstr_t bstrDescription(e.Description());
     _bstr_t bstrErrorMessage(e.ErrorMessage());
-    //_bstr_t bstrErrorInfo(e.ErrorInfo());
 
 	char szDesc[1024];
 	sprintf_s(szDesc, sizeof(szDesc), "Code = %08lx - Code meaning = %s - Source = %s", e.Error(), 
 		e.ErrorMessage(), (LPCSTR)bstrSource);
 
-	//BOOL fAlarm = ( m_fRetryingToConnect ) ? FALSE : TRUE;
-
 	theLog.Error( MOD_NAME, "ADO com error", szDesc, (LPCSTR)bstrDescription );
 
-	//vector<string> ProviderErrors = GetProviderErrors(TRUE);
-	//int nProvErrors = ProviderErrors.size();
-/*
-#ifndef DO_NOT_SHOW_MESSAGEBOXES_IN_CAdoSqlServer
-	char szMsg[1024];
-    // Display Com errors.
-	sprintf_s(szMsg, sizeof(szMsg), "Code = %08lx\n"
-		"Code meaning = %s\n"
-		"Source = %s\n"
-		"Description = %s\n", e.Error(), e.ErrorMessage(),
-		(LPCSTR)bstrSource, (LPCSTR)bstrDescription);
-	string ErrorMsg = szMsg;
-
-	ObjectStateEnum eState = (ObjectStateEnum)m_pADO_SQLconnection->State;
-	switch( eState )
-	{
-	case adStateClosed:
-		ErrorMsg += "\nConnection state : adStateClosed\n";
-		break;
-	case adStateOpen:
-		ErrorMsg += "\nConnection state : adStateOpen\n";
-		break;
-	case adStateConnecting:
-		ErrorMsg += "\nConnection state : adStateConnecting\n";
-		break;
-	case adStateExecuting:
-		ErrorMsg += "\nConnection state : adStateExecuting\n";
-		break;
-	case adStateFetching:
-		ErrorMsg += "\nConnection state : adStateFetching\n";
-		break;
-	}
-
-	if( nProvErrors )
-		ErrorMsg += "\nProvider error(s):\n";
-	for( int i = 0; i < nProvErrors; i++ )
-	{
-		ErrorMsg += ProviderErrors[i] + "\n";
-	}
-	//if( !m_fRetryingToConnect )	// No messagebox when retry connect in progress.
-	//	MessageBox( NULL, strMsg, strLogEvent, MB_OK );
-	//char szTmp[1024];
- //   // Display Com errors.
-	//sprintf_s( szTmp, sizeof(szTmp), "Code = %08lx\n"
-	//				"Code meaning = %s\n"
-	//				"Source = %s\n"
-	//				"Description = %s\n", e.Error(), e.ErrorMessage(),
-	//				(LPCSTR)bstrSource, (LPCSTR)bstrDescription );
-	//MessageBox( NULL, szTmp, strLogEvent, MB_OK );
-#endif
-*/
 	HRESULT error = e.Error();
-	//if (error == 0x80004005)	// Connection lost?
 	if (error == E_FAIL)	// Connection lost?
 	{
 		if( m_pADO_SQLconnection->State == adStateOpen )
