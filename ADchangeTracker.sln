@@ -19,6 +19,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		ADchangeTracker\CreateLogins.sql = ADchangeTracker\CreateLogins.sql
 		ADchangeTracker\Eula.rtf = ADchangeTracker\Eula.rtf
 		ADchangeTracker\EventXml.rdl = ADchangeTracker\EventXml.rdl
+		ADchangeTracker\FixEventRecordIDbug.sql = ADchangeTracker\FixEventRecordIDbug.sql
 		ADchangeTracker\Readme.rtf = ADchangeTracker\Readme.rtf
 		ADchangeTracker\Setup ADchangeTracker instructions.docx = ADchangeTracker\Setup ADchangeTracker instructions.docx
 		ADchangeTracker\Setup ADchangeTracker instructions.pdf = ADchangeTracker\Setup ADchangeTracker instructions.pdf
